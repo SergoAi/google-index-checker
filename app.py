@@ -28,24 +28,35 @@ def inspect_url(url, property_url):
     try:
         request_body = {"inspectionUrl": url, "siteUrl": property_url}
         response = webmasters.urlInspection().index().inspect(body=request_body).execute()
-        inspection_result = response.get('inspectionResult', {})
-        if not inspection_result:
-            return {"indexed": False, "error": "Нет данных от API"}
         
-        verdict = inspection_result.get('inspectionResult', {}).get('verdict')
-        coverage = inspection_result.get('inspectionResult', {}).get('coverageState', 'UNKNOWN')
-        last_crawl = inspection_result.get('inspectionResult', {}).get('lastCrawlTime', '—')
-        google_canonical = inspection_result.get('inspectionResult', {}).get('googleCanonical', '—')
+        inspection_result = response.get('inspectionResult', {})
+        if not inspection_result or 'inspectionResult' not in inspection_result:
+            return {
+                "indexed": False,
+                "coverage_state": "—",
+                "last_crawl_date": "—",
+                "gsc_canonical": "—",
+                "error": "Нет данных в Search Console"
+            }
+        
+        result_data = inspection_result['inspectionResult']
+        verdict = result_data.get('verdict', 'UNKNOWN')
         
         return {
             "indexed": verdict == "PASS",
-            "coverage_state": coverage,
-            "last_crawl_date": last_crawl,
-            "gsc_canonical": google_canonical,
+            "coverage_state": result_data.get('coverageState', '—'),
+            "last_crawl_date": result_data.get('lastCrawlTime', '—'),
+            "gsc_canonical": result_data.get('googleCanonical', '—'),
             "error": ""
         }
     except Exception as e:
-        return {"indexed": False, "error": str(e)}
+        return {
+            "indexed": False,
+            "coverage_state": "—",
+            "last_crawl_date": "—",
+            "gsc_canonical": "—",
+            "error": str(e)
+        }
 
 # === Ввод URL ===
 st.subheader("📥 Введите URL для проверки")
@@ -110,10 +121,11 @@ if urls:
                 data.append({
                     "URL": url,
                     "Индексирован": status_text,
-                    "Покрытие": res["coverage_state"],
-                    "Последний краул": res["last_crawl_date"],
-                    "Канонический URL": res["gsc_canonical"]
+                    "Покрытие": res.get("coverage_state", "—"),
+                    "Последний краул": res.get("last_crawl_date", "—"),
+                    "Канонический URL": res.get("gsc_canonical", "—")
                 })
+
             
             df_results = pd.DataFrame(data)
             st.dataframe(df_results, use_container_width=True)
